@@ -23,7 +23,7 @@ struct QuickConnectView: View {
     let action: (String) async -> Void
 
     @ContentBuilder
-    private func pollingView(code: String) -> some View {
+    private func pairingInstructions(code: String) -> some View {
         VStack(spacing: 20) {
             BulletedList(spacing: 16) {
                 Text(L10n.quickConnectStep1)
@@ -38,6 +38,20 @@ struct QuickConnectView: View {
                 .tracking(10)
                 .font(.largeTitle)
                 .monospacedDigit()
+        }
+    }
+
+    @ContentBuilder
+    private func pollingView(code: String) -> some View {
+        Group {
+            #if os(tvOS)
+            HStack(spacing: 64) {
+                QuickConnectQRCode(serverURL: client.configuration.url)
+                pairingInstructions(code: code)
+            }
+            #else
+            pairingInstructions(code: code)
+            #endif
         }
         .frame(
             maxWidth: .infinity,
