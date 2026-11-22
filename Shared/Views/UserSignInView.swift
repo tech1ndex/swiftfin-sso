@@ -43,6 +43,10 @@ struct UserSignInView: View {
     private var isPresentingExistingUser: Bool = false
     @State
     private var password: String = ""
+    #if os(iOS)
+    @State
+    private var isShowingSSO = false
+    #endif
     @State
     private var pinHint: String = ""
     @State
@@ -208,6 +212,21 @@ struct UserSignInView: View {
             .disabled(username.isEmpty)
         }
 
+        #if os(iOS)
+        if user == nil, viewModel.server.effectiveServerURL.scheme?.lowercased() == "https" {
+            Section {
+                Button("Sign in with SSO") { isShowingSSO = true }
+                    .disabled(viewModel.state == .signingIn)
+                    .sheet(isPresented: $isShowingSSO) {
+                        SSOSignInView(serverURL: viewModel.server.effectiveServerURL, serverID: viewModel.server.id) { url, userID, token in
+                            isShowingSSO = false
+                            viewModel.signInSSO(serverURL: url, userID: userID, token: token)
+                        }
+                    }
+            }
+        }
+        #endif
+
         if user == nil, viewModel.isQuickConnectEnabled {
             Section {
                 Button {
@@ -219,8 +238,14 @@ struct UserSignInView: View {
                         }
                     )
                 } label: {
-                    Text(L10n.quickConnect)
-                        .frame(maxWidth: .infinity)
+                    Group {
+                        #if os(tvOS)
+                        Text("Sign in with your phone")
+                        #else
+                        Text(L10n.quickConnect)
+                        #endif
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .listRowInsets(.zero)
                 .listRowBackground(Color.clear)

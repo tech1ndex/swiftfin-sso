@@ -47,6 +47,7 @@ final class UserSignInViewModel: ObservableObject {
         case getPublicData
         case signIn(username: String, password: String)
         case signInQuickConnect(secret: String)
+        case signInSSO(serverURL: URL, userID: String, token: String)
 
         case save(
             user: UserStateDataPair,
@@ -68,7 +69,7 @@ final class UserSignInViewModel: ObservableObject {
                 .none
             case .getPublicData:
                 .background(.gettingPublicData)
-            case .signIn, .signInQuickConnect:
+            case .signIn, .signInQuickConnect, .signInSSO:
                 .loop(.signingIn)
             }
         }
@@ -143,17 +144,7 @@ final class UserSignInViewModel: ObservableObject {
             throw ErrorMessage(L10n.unknownError)
         }
 
-        if let existingUser = existingUser(id: id) {
-            events.send(.existingUser(((existingUser, accessToken), userData)))
-        } else {
-            let newUserState = UserState(
-                id: id,
-                serverID: server.id,
-                username: username
-            )
-
-            events.send(.connected(((newUserState, accessToken), userData)))
-        }
+        finishSignIn(id: id, username: username, accessToken: accessToken, userData: userData)
     }
 
     @Function(\Action.Cases.signInQuickConnect)
@@ -171,6 +162,27 @@ final class UserSignInViewModel: ObservableObject {
             throw ErrorMessage(L10n.unknownError)
         }
 
+        finishSignIn(id: id, username: username, accessToken: accessToken, userData: userData)
+    }
+
+    @Function(\Action.Cases.signInSSO)
+    private func _signInSSO(_ serverURL: URL, _ userID: String, _ token: String) async throws {
+        guard serverURL == server.effectiveServerURL else { throw ErrorMessage(L10n.unknownError) }
+        let client = JellyfinClient(
+            configuration: .swiftfinConfiguration(url: serverURL, accessToken: token),
+            sessionConfiguration: .ephemeral,
+            sessionDelegate: SSOValidationDelegate()
+        )
+        let user = try await client.send(Paths.getCurrentUser).value
+        try Task.checkCancellation()
+        guard user.id == userID, user.serverID == server.id, let username = user.name,
+              existingUser(id: userID).map({ $0.serverID == server.id }) ?? true
+        else { throw ErrorMessage("The SSO session does not match the selected Jellyfin account or server.") }
+
+        finishSignIn(id: userID, username: username, accessToken: token, userData: user)
+    }
+
+    private func finishSignIn(id: String, username: String, accessToken: String, userData: UserDto) {
         if let existingUser = existingUser(id: id) {
             events.send(.existingUser(((existingUser, accessToken), userData)))
         } else {
@@ -294,5 +306,18 @@ final class UserSignInViewModel: ObservableObject {
 
         let isEnabled = try? JSONDecoder().decode(Bool.self, from: response.value)
         return isEnabled ?? false
+    }
+}
+
+// Keep the authenticated validation request on the selected Jellyfin endpoint.
+private final class SSOValidationDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
     }
 }
