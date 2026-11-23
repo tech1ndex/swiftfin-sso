@@ -88,7 +88,11 @@ extension UserState {
 
     /// Deletes the model that this state represents and
     /// all settings from `Defaults` `Keychain`, and `StoredValues`
+    @MainActor
     func delete() throws {
+        #if os(iOS)
+        try OfflineDownloadStore.shared.removeDownloads(serverID: serverID, userID: id)
+        #endif
         var users = StoredValues[.User.users]
         users.removeAll { $0.id == id }
         StoredValues[.User.users] = users

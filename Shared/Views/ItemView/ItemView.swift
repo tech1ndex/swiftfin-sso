@@ -193,8 +193,9 @@ struct ItemView: View {
         }
         .navigationBarMenuButton(
             isLoading: viewModel.background.is(.refreshing),
-            isHidden: overflow.isEmpty && menu.isEmpty
+            isHidden: overflow.isEmpty && menu.isEmpty && !OfflineDownloadButton.isAvailable(for: provider.item)
         ) {
+            OfflineDownloadButton(provider: provider)
             ItemActionButtons.MenuContent(
                 provider: provider,
                 buttons: overflow,
