@@ -628,8 +628,22 @@ internal enum L10n {
   internal static let doubleTouch = L10n.tr("Localizable", "doubleTouch", fallback: "Double touch")
   /// Download
   internal static let download = L10n.tr("Localizable", "download", fallback: "Download")
+  /// Choose Download from a movie or episode’s menu to watch it offline.
+  internal static let downloadEmptyDescription = L10n.tr("Localizable", "downloadEmptyDescription", fallback: "Choose Download from a movie or episode’s menu to watch it offline.")
+  /// Download failed (HTTP %d).
+  internal static func downloadHTTPError(_ p1: Int) -> String {
+    return L10n.tr("Localizable", "downloadHTTPError", p1, fallback: "Download failed (HTTP %d).")
+  }
+  /// There is not enough free space for this download.
+  internal static let downloadInsufficientSpace = L10n.tr("Localizable", "downloadInsufficientSpace", fallback: "There is not enough free space for this download.")
+  /// The download was interrupted. Try again.
+  internal static let downloadInterrupted = L10n.tr("Localizable", "downloadInterrupted", fallback: "The download was interrupted. Try again.")
+  /// The server did not return a media file.
+  internal static let downloadInvalidFile = L10n.tr("Localizable", "downloadInvalidFile", fallback: "The server did not return a media file.")
   /// Downloads
   internal static let downloads = L10n.tr("Localizable", "downloads", fallback: "Downloads")
+  /// This item is unavailable for download.
+  internal static let downloadUnavailable = L10n.tr("Localizable", "downloadUnavailable", fallback: "This item is unavailable for download.")
   /// Dropped frames
   internal static let droppedFrames = L10n.tr("Localizable", "droppedFrames", fallback: "Dropped frames")
   /// This saves the URL as another connection for the existing server and makes it active.

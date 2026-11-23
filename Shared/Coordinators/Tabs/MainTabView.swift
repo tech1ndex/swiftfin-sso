@@ -36,6 +36,9 @@ struct MainTabView: View {
             TabItem.contentGroup(provider: DefaultContentGroupProvider())
             TabItem.search
             TabItem.media
+            TabItem(id: "downloads", title: L10n.downloads, systemImage: "arrow.down.circle") {
+                OfflineDownloadsView()
+            }
         }
         #else
         TabCoordinator {

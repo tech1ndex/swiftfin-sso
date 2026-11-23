@@ -58,7 +58,11 @@ extension ServerState {
 
     /// Deletes the model that this state represents and
     /// all settings from `StoredValues`.
+    @MainActor
     func delete() throws {
+        #if os(iOS)
+        try OfflineDownloadStore.shared.removeDownloads(serverID: id)
+        #endif
         let users = StoredValues[.User.users]
             .filter { $0.serverID == id }
 

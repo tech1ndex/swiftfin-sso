@@ -12,6 +12,9 @@ import UIKit
 @main
 struct SwiftfinApp: App {
 
+    @UIApplicationDelegateAdaptor
+    private var appDelegate: SwiftfinAppDelegate
+
     init() {
         Self.configure()
 
@@ -29,6 +32,26 @@ struct SwiftfinApp: App {
         WindowGroup {
             RootView()
         }
+    }
+}
+
+final class SwiftfinAppDelegate: NSObject, UIApplicationDelegate {
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard identifier == OfflineDownloadStore.sessionIdentifier else {
+            completionHandler()
+            return
+        }
+
+        OfflineDownloadStore.shared.handleBackgroundEvents(completion: completionHandler)
+    }
+
+    func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
+        try? OfflineDownloadStore.shared.load()
     }
 }
 
