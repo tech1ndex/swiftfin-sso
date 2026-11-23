@@ -16,6 +16,8 @@ struct OfflineVideoPlayer: View {
     private var dismiss
     @Environment(\.scenePhase)
     private var scenePhase
+    @Environment(\.layoutDirection)
+    private var layoutDirection
 
     let url: URL
     let title: String
@@ -26,8 +28,14 @@ struct OfflineVideoPlayer: View {
     private var player: MPVPlayer?
     @State
     private var showsControls = true
-    @State
+    @GestureState
     private var scrubPosition: Double?
+    @State
+    private var pendingPosition: Double?
+    @State
+    private var seekTask: Task<Void, Never>?
+    @State
+    private var seekError: Error?
     @State
     private var lastCheckpoint: Double?
     @State
@@ -75,6 +83,7 @@ struct OfflineVideoPlayer: View {
             }
         }
         .preferredColorScheme(.dark)
+        .errorMessage($seekError)
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         .supportedOrientations(.all)
@@ -124,6 +133,7 @@ struct OfflineVideoPlayer: View {
         .onDisappear {
             guard let player else { return }
 
+            seekTask?.cancel()
             checkpoint()
             player.stop()
             self.player = nil
@@ -152,8 +162,7 @@ struct OfflineVideoPlayer: View {
 
     private func controls(for player: MPVPlayer) -> some View {
         let duration = player.duration.seconds
-        let position = scrubPosition ?? player.position.seconds
-        let range = 0 ... max(1, duration)
+        let position = scrubPosition ?? pendingPosition ?? player.position.seconds
 
         return HStack {
             Button { player.togglePlayback() } label: {
@@ -162,20 +171,7 @@ struct OfflineVideoPlayer: View {
             }
 
             VStack {
-                Slider(
-                    value: Binding(
-                        get: { min(max(0, position), range.upperBound) },
-                        set: { scrubPosition = $0 }
-                    ),
-                    in: range
-                ) { editing in
-                    if !editing, let scrubPosition {
-                        player.seek(to: .seconds(scrubPosition))
-                        self.scrubPosition = nil
-                    }
-                }
-                .disabled(!player.isSeekable || duration <= 0)
-                .accessibilityLabel(L10n.seek)
+                seekBar(player, position: position, duration: duration)
 
                 HStack {
                     Text(Duration.seconds(position), format: .time(pattern: .hourMinuteSecond))
@@ -214,6 +210,67 @@ struct OfflineVideoPlayer: View {
         .tint(.white)
         .foregroundStyle(.white)
         .background(.black.opacity(0.72))
+    }
+
+    private func seekBar(_ player: MPVPlayer, position: Double, duration: Double) -> some View {
+        let total = max(1, duration)
+        return GeometryReader { geometry in
+            let width = geometry.size.width
+            ProgressView(value: min(max(0, position), total), total: total)
+                .progressViewStyle(.linear)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .updating($scrubPosition) { drag, preview, _ in
+                            preview = targetSeconds(at: drag.location.x, width: width, duration: duration)
+                        }
+                        .onEnded { drag in
+                            guard let target = targetSeconds(at: drag.location.x, width: width, duration: duration) else { return }
+
+                            seek(player, to: target)
+                        }
+                )
+        }
+        .frame(height: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.seek)
+        .accessibilityValue(Duration.seconds(position).formatted(.spokenRuntime))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: seek(player, to: min(duration, position + 10))
+            case .decrement: seek(player, to: max(0, position - 10))
+            @unknown default: break
+            }
+        }
+        .disabled(!player.isSeekable || duration <= 0)
+    }
+
+    private func targetSeconds(at x: CGFloat, width: CGFloat, duration: Double) -> Double? {
+        guard width > 0, duration > 0 else { return nil }
+
+        let fraction = min(max(0, x / width), 1)
+        return duration * (layoutDirection == .rightToLeft ? 1 - fraction : fraction)
+    }
+
+    private func seek(_ player: MPVPlayer, to seconds: Double) {
+        seekTask?.cancel()
+        pendingPosition = seconds
+        seekTask = Task { @MainActor in
+            do {
+                let result = try await player.seekAndWait(to: .seconds(seconds))
+                guard !Task.isCancelled else { return }
+
+                lastCheckpoint = result.position.seconds
+                onPosition(result.position.seconds)
+            } catch {
+                guard !Task.isCancelled else { return }
+
+                seekError = error
+            }
+            pendingPosition = nil
+            seekTask = nil
+        }
     }
 
     @ContentBuilder
