@@ -45,6 +45,10 @@ Swiftfin provides detailed documentation to help you understand key aspects of t
 - [🐞 Common Issues](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/common_issues.md) — If you are experiencing an issue with Swiftfin, this is the best place to start.
 - [💜 Supporting Development](https://jellyfin.org/docs/general/contributing/direct-donations) — Learn how you can support project development.
 
+### Offline viewing on iPhone and iPad
+
+In this fork, open a movie or episode and choose **Download** from its menu to save the original-quality video. The option appears when your Jellyfin account has permission to download that item. Once the download finishes, open the **Downloads** tab to watch it offline or resume where you left off on that device.
+
 ## ⚙️ Development
 
 Thank you for your interest in Swiftfin! Please check out the [Contribution Guidelines](https://github.com/jellyfin/Swiftfin/blob/main/Documentation/contributing.md) to get started.
