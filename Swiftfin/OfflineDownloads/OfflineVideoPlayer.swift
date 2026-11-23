@@ -28,6 +28,10 @@ struct OfflineVideoPlayer: View {
     private var player: MPVPlayer?
     @State
     private var showsControls = true
+    @State
+    private var showsTracks = false
+    @State
+    private var textSubtitles = TextSubtitlePresentation()
     @GestureState
     private var scrubPosition: Double?
     @State
@@ -47,9 +51,20 @@ struct OfflineVideoPlayer: View {
             Color.black.ignoresSafeArea()
 
             if let player {
-                MPVVideoPlayer(player: player)
-                    .ignoresSafeArea()
-                    .accessibilityHidden(true)
+                GeometryReader { viewport in
+                    let dimensions = player.mediaInformation.presentationDimensions
+                    MPVVideoPlayerView(
+                        player: player,
+                        textSubtitles: textSubtitles,
+                        layout: .init(
+                            videoSize: dimensions.map { CGSize(width: $0.width, height: $0.height) } ?? .zero,
+                            viewportSize: viewport.size,
+                            behavior: .fit
+                        ),
+                        isPictureInPictureActive: false
+                    )
+                }
+                .ignoresSafeArea()
 
                 Button {
                     showsControls.toggle()
@@ -84,6 +99,15 @@ struct OfflineVideoPlayer: View {
         }
         .preferredColorScheme(.dark)
         .errorMessage($seekError)
+        .sheet(isPresented: $showsTracks) {
+            if let player {
+                OfflineTrackSelection(player: player) {
+                    showsTracks = false
+                    showsControls = false
+                }
+                .presentationDetents([.medium, .large])
+            }
+        }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         .supportedOrientations(.all)
@@ -93,6 +117,7 @@ struct OfflineVideoPlayer: View {
             previousIdleTimerSetting = UIApplication.shared.isIdleTimerDisabled
             let player = MPVPlayer()
             self.player = player
+            textSubtitles.start(player)
             player.load(url, playAutomatically: true, startTime: .seconds(startSeconds.isFinite ? max(0, startSeconds) : 0))
         }
         .onChange(of: player?.position) { _, _ in
@@ -135,6 +160,7 @@ struct OfflineVideoPlayer: View {
 
             seekTask?.cancel()
             checkpoint()
+            textSubtitles.clear()
             player.stop()
             self.player = nil
             UIApplication.shared.isIdleTimerDisabled = previousIdleTimerSetting
@@ -181,25 +207,8 @@ struct OfflineVideoPlayer: View {
                 .font(.caption.monospacedDigit())
             }
 
-            Menu {
-                Picker(L10n.audio, selection: Binding(
-                    get: { player.audioTracks.first(where: \.isSelected)?.id },
-                    set: {
-                        if let id = $0 {
-                            player.selectTrack(id)
-                        }
-                    }
-                )) {
-                    trackOptions(player.audioTracks)
-                }
-
-                Picker(L10n.subtitles, selection: Binding(
-                    get: { player.selectedSubtitle()?.id },
-                    set: { player.selectSubtitle($0, for: .primary) }
-                )) {
-                    Text(L10n.off).tag(nil as MPVMediaTrackIdentifier?)
-                    trackOptions(player.subtitleTracks)
-                }
+            Button {
+                showsTracks = true
             } label: {
                 Label(L10n.tracks, systemImage: "captions.bubble")
                     .frame(width: 44, height: 44)
@@ -273,16 +282,6 @@ struct OfflineVideoPlayer: View {
         }
     }
 
-    @ContentBuilder
-    private func trackOptions(_ tracks: [MPVMediaTrack]) -> some View {
-        ForEach(tracks) { track in
-            let language = track.language.map { Locale.current.localizedString(forLanguageCode: $0) ?? $0 }
-            let name = track.title ?? language ?? track.codec ?? L10n.subtitleTrack
-            Text(verbatim: "\(track.mpvID) · \(name)")
-                .tag(Optional(track.id))
-        }
-    }
-
     private func checkpoint() {
         guard let player, player.isPlaybackReady || player.state == .ended else { return }
 
@@ -291,5 +290,76 @@ struct OfflineVideoPlayer: View {
 
         lastCheckpoint = position
         onPosition(position)
+    }
+}
+
+private struct OfflineTrackSelection: View {
+
+    let player: MPVPlayer
+    let onSelect: () -> Void
+
+    @ContentBuilder
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(L10n.audio) {
+                    ForEach(player.audioTracks) { track in
+                        option(title: trackName(track), selected: track.isSelected) {
+                            player.selectTrack(track.id)
+                        }
+                    }
+                }
+
+                Section {
+                    let selected = player.selectedSubtitle()?.id
+                    option(title: L10n.off, selected: selected == nil) {
+                        player.selectSubtitle(nil)
+                    }
+                    ForEach(player.subtitleTracks) { track in
+                        option(title: trackName(track), selected: selected == track.id) {
+                            player.selectSubtitle(track.id)
+                        }
+                    }
+                } header: {
+                    Text(L10n.subtitles)
+                } footer: {
+                    Text(L10n.downloadSubtitleTracksDescription)
+                }
+            }
+            .navigationTitle(L10n.tracks)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.done, action: onSelect)
+                }
+            }
+        }
+    }
+
+    @ContentBuilder
+    private func option(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            onSelect()
+        } label: {
+            HStack {
+                Text(verbatim: title)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark")
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func trackName(_ track: MPVMediaTrack) -> String {
+        let language = track.language?.nilIfBlank.map { Locale.current.localizedString(forLanguageCode: $0) ?? $0 }
+        let title = track.title?.nilIfBlank
+        if let language, let title, language.localizedCaseInsensitiveCompare(title) != .orderedSame {
+            return "\(language) · \(title)"
+        }
+        return language ?? title ?? "\(L10n.subtitleTrack) \(track.mpvID)"
     }
 }

@@ -642,6 +642,8 @@ internal enum L10n {
   internal static let downloadInvalidFile = L10n.tr("Localizable", "downloadInvalidFile", fallback: "The server did not return a media file.")
   /// Downloads
   internal static let downloads = L10n.tr("Localizable", "downloads", fallback: "Downloads")
+  /// Offline playback uses the subtitle tracks embedded in the downloaded file.
+  internal static let downloadSubtitleTracksDescription = L10n.tr("Localizable", "downloadSubtitleTracksDescription", fallback: "Offline playback uses the subtitle tracks embedded in the downloaded file.")
   /// This item is unavailable for download.
   internal static let downloadUnavailable = L10n.tr("Localizable", "downloadUnavailable", fallback: "This item is unavailable for download.")
   /// Dropped frames
