@@ -22,7 +22,7 @@ struct OfflineVideoPlayer: View {
     let url: URL
     let title: String
     let startSeconds: Double
-    let onPosition: (Double) -> Void
+    let onPosition: (Double, Bool) -> Void
 
     @State
     private var player: MPVPlayer?
@@ -42,6 +42,8 @@ struct OfflineVideoPlayer: View {
     private var seekError: Error?
     @State
     private var lastCheckpoint: Double?
+    @State
+    private var reportedCompletion = false
     @State
     private var previousIdleTimerSetting = false
 
@@ -271,7 +273,7 @@ struct OfflineVideoPlayer: View {
                 guard !Task.isCancelled else { return }
 
                 lastCheckpoint = result.position.seconds
-                onPosition(result.position.seconds)
+                onPosition(result.position.seconds, false)
             } catch {
                 guard !Task.isCancelled else { return }
 
@@ -286,10 +288,14 @@ struct OfflineVideoPlayer: View {
         guard let player, player.isPlaybackReady || player.state == .ended else { return }
 
         let position = player.state == .ended ? 0 : player.position.seconds
-        guard position >= 0, position.isFinite, position != lastCheckpoint else { return }
+        guard position >= 0,
+              position.isFinite,
+              position != lastCheckpoint || (player.state == .ended && !reportedCompletion) else { return }
+
+        reportedCompletion = player.state == .ended
 
         lastCheckpoint = position
-        onPosition(position)
+        onPosition(position, player.state == .ended)
     }
 }
 
