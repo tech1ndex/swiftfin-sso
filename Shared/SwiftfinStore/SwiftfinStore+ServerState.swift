@@ -61,6 +61,7 @@ extension ServerState {
     @MainActor
     func delete() throws {
         #if os(iOS)
+        try OfflineWatchQueue.shared.remove(serverID: id)
         try OfflineDownloadStore.shared.removeDownloads(serverID: id)
         #endif
         let users = StoredValues[.User.users]

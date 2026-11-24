@@ -90,8 +90,24 @@ struct OfflineDownloadsView: View {
             do { try store.load() } catch { self.error = error }
         }
         .fullScreenCover(item: $playing) { entry in
-            OfflineVideoPlayer(url: store.fileURL(for: entry), title: entry.title, startSeconds: entry.resumeSeconds) {
-                store.savePosition($0, for: entry)
+            OfflineVideoPlayer(
+                url: store.fileURL(for: entry),
+                title: entry.title,
+                startSeconds: entry.resumeSeconds
+            ) { seconds, completed in
+                store.savePosition(seconds, for: entry)
+                do {
+                    try OfflineWatchQueue.shared.record(
+                        serverID: entry.serverID,
+                        userID: entry.userID,
+                        itemID: entry.itemID,
+                        seconds: seconds,
+                        completed: completed
+                    )
+                    OfflineWatchSync.shared.schedule()
+                } catch {
+                    self.error = error
+                }
             }
         }
         .errorMessage($error)

@@ -206,6 +206,9 @@ final class UserSessionManager: ObservableObject {
     @MainActor
     func appWillEnterForeground() async {
         scheduleServerConnectionResolution()
+        #if os(iOS)
+        OfflineWatchSync.shared.wake()
+        #endif
 
         Task {
             await refreshServerInformationIfNeeded(reason: .stale)
@@ -328,6 +331,9 @@ final class UserSessionManager: ObservableObject {
 
         currentUserChanges = nil
         await stopActivePlayback()
+        #if os(iOS)
+        OfflineWatchSync.shared.stop()
+        #endif
         previousSession?.willStop()
         await newSession?.willStart()
 
@@ -361,6 +367,11 @@ final class UserSessionManager: ObservableObject {
             }
 
         newSession?.didStart()
+        #if os(iOS)
+        if let newSession {
+            OfflineWatchSync.shared.start(newSession)
+        }
+        #endif
     }
 
     private func resolveStoredSession() throws -> UserSession? {
