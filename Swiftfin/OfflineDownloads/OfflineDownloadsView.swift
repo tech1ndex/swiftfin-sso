@@ -9,6 +9,7 @@
 import FactoryKit
 import JellyfinAPI
 import SwiftUI
+import Transmission
 
 struct OfflineDownloadButton: View {
 
@@ -89,7 +90,17 @@ struct OfflineDownloadsView: View {
         .onAppear {
             do { try store.load() } catch { self.error = error }
         }
-        .fullScreenCover(item: $playing) { entry in
+        .presentation(
+            $playing,
+            transition: .slide(
+                .init(edge: .bottom),
+                options: .init(
+                    isInteractive: false,
+                    modalPresentationCapturesStatusBarAppearance: true
+                )
+            )
+        ) { entryBinding in
+            let entry = entryBinding.wrappedValue
             PreferencesView {
                 OfflineVideoPlayer(
                     url: store.fileURL(for: entry),
@@ -122,7 +133,7 @@ struct OfflineDownloadsView: View {
         case .ready:
             Button {
                 mediaPlayerManager.stop()
-                playing = entry
+                withAnimation { playing = entry }
             } label: {
                 Label(entry.title, systemImage: "play.circle")
             }
