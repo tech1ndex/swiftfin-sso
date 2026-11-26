@@ -182,6 +182,21 @@ struct OfflineVideoPlayer: View {
                 .font(.headline)
                 .lineLimit(1)
             Spacer()
+            Button {
+                guard let scene = UIApplication.shared
+                    .connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .first(where: { $0.activationState == .foregroundActive }) else { return }
+
+                let orientations: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscapeRight
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { error in
+                    Task { @MainActor in seekError = error }
+                }
+            } label: {
+                Label(L10n.rotate, systemImage: "rotate.right")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 44, height: 44)
+            }
         }
         .padding(.horizontal)
         .background(.black.opacity(0.72))
